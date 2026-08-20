@@ -1,86 +1,96 @@
-# CIFAR-10: CNN from Scratch vs. Transfer Learning
+# CIFAR-10: CNN from scratch vs. transfer learning
 
-A controlled comparison of a small convolutional network trained from scratch against a
-fine-tuned ResNet-18, with an ablation on data augmentation. Every configuration is run
-across 3 random seeds and reported as mean +/- standard deviation, because single-run
-accuracy numbers on CIFAR-10 vary by more than most of the differences people report.
+I wanted to find out how much ImageNet pretraining actually helps on CIFAR-10, and
+how much of that gap I could close just by adding data augmentation to a network I
+trained myself. So I set both up properly and compared them.
 
-## Research questions
+Every configuration runs on multiple random seeds and I report the mean and standard
+deviation, because when I first ran this I noticed the accuracy moved around by almost
+a full point between seeds. That is close to the size of some of the differences I was
+trying to measure, so a single number would not have told me much.
 
-1. How much accuracy does ImageNet pretraining buy on CIFAR-10, and at what cost in
-   trainable parameters?
-2. How much of the scratch model's gap is closed by data augmentation alone?
-3. Which classes remain hard after both, and are the errors systematic?
+## What I compared
 
-## Experimental setup
-
-| | Scratch CNN | ResNet-18 (transfer) |
+|  | Scratch CNN | ResNet-18 (transfer) |
 |---|---|---|
 | Architecture | 3 conv blocks (32/64/128), batch norm, dropout 0.5 | torchvision ResNet-18, ImageNet weights, new FC head |
-| Input | 32x32 | 64x64 (upsampled) |
+| Input size | 32x32 | 64x64 (upsampled) |
 | Optimiser | SGD, lr 0.01, momentum 0.9, weight decay 5e-4 | Adam, lr 1e-3 |
 | Schedule | Cosine annealing | Cosine annealing |
 | Epochs | 20 | 10 |
-| Seeds | 0, 1, 2 | 0, 1, 2 |
 
-Augmentation, where enabled: random crop with 4px padding + random horizontal flip.
-No test-time augmentation. The test set is used only for evaluation, never for
-model selection across configurations.
+The ResNet gets fewer epochs because it converges much faster - the backbone already
+knows how to extract features, so only the head really needs training.
+
+Where augmentation is enabled it is random crop with 4px padding plus random horizontal
+flip. No test-time augmentation. I only look at the test set to evaluate, never to pick
+between configurations.
 
 ## Results
 
-<!-- Paste the contents of results/summary.md here after running the experiments. -->
+<!-- Paste the table from results/summary.md here -->
 
-_Run `./run_all.sh`, then paste `results/summary.md` into this section._
+Figures are in `results/figures/` and the per-class breakdown is in
+`results/per_class_report.txt`.
 
-**Figures:** `results/figures/curves.png`, `results/figures/confusion_matrix.png`
-**Per-class breakdown:** `results/per_class_report.txt`
+### What I found
 
-### Observations
+<!-- Write 3-4 sentences here after you look at your own results.
+     Things worth commenting on:
+       - how big the scratch vs ResNet gap is, and whether it surprised you
+       - how much augmentation alone closed it
+       - which two classes get mixed up most, and whether that makes sense
+       - whether any differences were smaller than the seed-to-seed variation -->
 
-<!-- Fill in after running. Write what you actually observed, including anything that
-     surprised you or contradicted your expectation. -->
-
-## Reproducing
+## Running it
 
 ```bash
 pip install -r requirements.txt
-./run_all.sh              # full grid, ~40 min on a Colab T4
+./run_all.sh
 ```
 
-Single run:
+That runs everything and takes roughly 40 minutes on a Colab T4. On CPU it is far
+slower, so I would not recommend it.
+
+To run a single configuration:
 
 ```bash
 cd src
 python train.py --model scratch --epochs 20 --augment --seed 0
-python train.py --model resnet18 --epochs 10 --augment --seed 0
 python report.py
 ```
 
-## Repository layout
+## What is in here
 
 ```
-src/data.py      CIFAR-10 loaders; augmentation behind a flag so it can be ablated
-src/models.py    SmallCNN (from scratch) and ResNet-18 transfer head
-src/train.py     Training loop, per-epoch eval, JSON metrics + saved predictions
-src/report.py    Aggregates runs into a table, curves, confusion matrix, per-class report
-run_all.sh       Full experiment grid across 3 seeds
-results/         Per-run JSON, predictions, figures (generated)
+src/data.py      loads CIFAR-10; augmentation is behind a flag so I could ablate it
+src/models.py    the small CNN, and the ResNet-18 with a replaced head
+src/train.py     training loop, evaluates each epoch, writes metrics to JSON
+src/report.py    builds the summary table, curves, confusion matrix, per-class report
+run_all.sh       runs the whole grid
+results/         generated output
 ```
 
-## Limitations
+## Things this does not show
 
-- CIFAR-10 at 32x32 is a small, well-studied benchmark; results here should not be
-  read as evidence about performance on higher-resolution or domain-specific data.
-- ResNet-18 sees 64x64 upsampled inputs, so the comparison is not parameter-matched;
-  it measures "pretrained backbone + upsampling" as a package, not pretraining alone.
-- Hyperparameters were set to sensible defaults rather than tuned per configuration.
-  A tuned scratch model would close some of the reported gap.
-- 3 seeds is enough to show that differences exceed seed noise, not enough for a
-  tight confidence interval.
+A few caveats I ran into that are worth stating rather than hiding:
 
-## Next steps
+The comparison is not parameter-matched. The ResNet sees 64x64 upsampled inputs while
+the scratch CNN sees 32x32, so what I am really measuring is "pretrained backbone plus
+upsampling" as a package, not the effect of pretraining on its own. Separating those
+would need another experiment.
 
-- Iterative magnitude pruning (Lottery Ticket Hypothesis) on the scratch CNN, to test
-  how far the network can be sparsified before accuracy degrades.
-- Temporal modelling: extend the evaluation methodology to a video or time-series task.
+I did not tune hyperparameters per configuration. I picked reasonable defaults for each
+and left them. A properly tuned scratch model would probably close part of the gap I
+report.
+
+CIFAR-10 is small and heavily studied, so none of this says anything about how either
+approach behaves on higher-resolution or domain-specific images.
+
+And the seed count is enough to show that the differences are bigger than random
+variation, but not enough for a tight confidence interval.
+
+## Next
+
+I want to try iterative magnitude pruning on the scratch CNN, following the Lottery
+Ticket Hypothesis paper, to see how far it can be sparsified before accuracy drops off.
