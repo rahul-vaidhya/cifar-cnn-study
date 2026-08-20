@@ -14,13 +14,13 @@ if not runs:
 # ---- summary table (mean +/- std across seeds) -------------------------------
 groups = {}
 for r in runs:
-    groups.setdefault((r["model"], r["augment"], r.get("freeze_backbone", False)), []).append(r)
+    groups.setdefault((r["model"], r["augment"], r.get("freeze_backbone", False), r["epochs"]), []).append(r)
 
-lines = ["| Model | Augmentation | Frozen backbone | Trainable params | Seeds | Best test acc (%) |",
+lines = ["| Model | Augmentation | Epochs | Trainable params | Seeds | Best test acc (%) |",
          "|---|---|---|---|---|---|"]
-for (model, aug, frz), rs in sorted(groups.items()):
+for (model, aug, frz, ep), rs in sorted(groups.items()):
     accs = np.array([r["best_test_acc"] for r in rs])
-    lines.append(f"| {model} | {'yes' if aug else 'no'} | {'yes' if frz else 'no'} | "
+    lines.append(f"| {model} | {'yes' if aug else 'no'} | {ep} | "
                  f"{rs[0]['trainable_params']:,} | {len(rs)} | "
                  f"{accs.mean():.2f} +/- {accs.std():.2f} |")
 table = "\n".join(lines)
