@@ -59,6 +59,7 @@ def main():
            torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=5e-4))
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=a.epochs)
 
+    os.makedirs("results", exist_ok=True)
     hist = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": []}
     best, t0 = 0.0, time.time()
     for ep in range(1, a.epochs + 1):
@@ -80,7 +81,6 @@ def main():
         print(f"[{tag}] ep {ep:02d}/{a.epochs} "
               f"train {hist['train_acc'][-1]:.2f}% | test {te_acc:.2f}% | best {best:.2f}%")
 
-    os.makedirs("results", exist_ok=True)
     json.dump({"tag": tag, "model": a.model, "augment": a.augment,
                "freeze_backbone": a.freeze_backbone, "seed": a.seed,
                "epochs": a.epochs, "lr": lr, "trainable_params": n_params,
